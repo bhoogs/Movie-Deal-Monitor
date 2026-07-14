@@ -102,7 +102,9 @@ def amazon_deals(title):
             continue
         if offer["package"]["clearName"] != "Amazon Video":
             continue
-        if offer["presentationType"] not in ("HD", "_4K"):
+        if offer["presentationType"] not in ("HD", "_4K", "SD"):
+            continue
+        if offer["presentationType"] == "SD" and title != "The King's Speech":
             continue
         price = parse_price(offer.get("retailPrice"))
         if price is None or price >= PRICE_THRESHOLD:
