@@ -108,7 +108,13 @@ def search_deals(title):
         if store not in TARGET_STORES:
             continue
         price = offer.get("retailPrice")
-        if price is None or price >= PRICE_THRESHOLD:
+        if price is None:
+            continue
+        try:
+            price = float(price)
+        except (ValueError, TypeError):
+            continue
+        if price >= PRICE_THRESHOLD:
             continue
         deals.append((store, offer["presentationType"], price))
     return deals
