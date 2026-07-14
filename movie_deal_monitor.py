@@ -102,6 +102,8 @@ def amazon_deals(title):
             continue
         if offer["package"]["clearName"] != "Amazon Video":
             continue
+        if offer["presentationType"] not in ("HD", "_4K"):
+            continue
         price = parse_price(offer.get("retailPrice"))
         if price is None or price >= PRICE_THRESHOLD:
             continue
@@ -133,14 +135,10 @@ def itunes_deals(title):
     if not match:
         return []
 
-    sd_price = parse_price(match.get("trackPrice"))
     hd_price = parse_price(match.get("trackHdPrice"))
-    best = None
-    for p in (sd_price, hd_price):
-        if p is not None and p < PRICE_THRESHOLD:
-            if best is None or p < best:
-                best = p
-    return [("iTunes", best)] if best is not None else []
+    if hd_price is not None and hd_price < PRICE_THRESHOLD:
+        return [("iTunes", hd_price)]
+    return []
 
 
 def load_seen():
