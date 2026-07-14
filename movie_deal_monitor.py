@@ -12,7 +12,6 @@ SCRIPT_DIR = Path(__file__).parent
 SEEN_FILE  = SCRIPT_DIR / "seen_deals.json"
 
 PRICE_THRESHOLD = 12.00
-TARGET_STORES   = {"Amazon Video", "Apple TV Store"}
 
 MOVIES = [
     "Good Will Hunting",
@@ -56,43 +55,40 @@ MOVIES = [
     "The Emperor's New Groove",
 ]
 
-GRAPHQL_QUERY = """
+JW_QUERY = """
 query SearchMovie($query: String!) {
   searchTitles(
-    country: US,
-    language: "en",
-    first: 1,
-    source: "justwatch",
+    country: US, language: "en", first: 1, source: "justwatch",
     filter: { searchQuery: $query, objectTypes: [MOVIE] }
   ) {
-    edges {
-      node {
-        content(country: US, language: "en") {
-          title
-          originalReleaseYear
-        }
-        offers(country: US, platform: WEB) {
-          monetizationType
-          retailPrice(language: "en")
-          currency
-          presentationType
-          package { clearName }
-        }
+    edges { node {
+      offers(country: US, platform: WEB) {
+        monetizationType retailPrice(language: "en") presentationType
+        package { clearName }
       }
-    }
+    } }
   }
 }
 """
 
 
-def search_deals(title):
+def parse_price(raw):
+    if raw is None:
+        return None
+    try:
+        return float(str(raw).lstrip("$"))
+    except (ValueError, TypeError):
+        return None
+
+
+def amazon_deals(title):
     resp = requests.post(
         "https://apis.justwatch.com/graphql",
         headers={
             "Content-Type": "application/json",
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
         },
-        json={"query": GRAPHQL_QUERY, "variables": {"query": title}},
+        json={"query": JW_QUERY, "variables": {"query": title}},
         timeout=15,
     )
     resp.raise_for_status()
@@ -104,19 +100,45 @@ def search_deals(title):
     for offer in edges[0]["node"]["offers"]:
         if offer["monetizationType"] != "BUY":
             continue
-        store = offer["package"]["clearName"]
-        if store not in TARGET_STORES:
+        if offer["package"]["clearName"] != "Amazon Video":
             continue
-        price = offer.get("retailPrice")
-        if price is None:
+        price = parse_price(offer.get("retailPrice"))
+        if price is None or price >= PRICE_THRESHOLD:
             continue
-        try:
-            price = float(str(price).lstrip("$"))
-        except (ValueError, TypeError):
+        deals.append(("Amazon", offer["presentationType"], price))
+    return deals
+
+
+def itunes_deals(title):
+    resp = requests.get(
+        "https://itunes.apple.com/search",
+        params={"term": title, "entity": "movie", "country": "us", "limit": 5},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    results = resp.json().get("results", [])
+
+    # Find best title match
+    title_lower = title.lower()
+    match = None
+    for r in results:
+        if r.get("wrapperType") != "track":
             continue
-        if price >= PRICE_THRESHOLD:
-            continue
-        deals.append((store, offer["presentationType"], price))
+        if title_lower in r.get("trackName", "").lower():
+            match = r
+            break
+    if not match and results:
+        match = results[0]
+    if not match:
+        return []
+
+    deals = []
+    sd_price = parse_price(match.get("trackPrice"))
+    hd_price = parse_price(match.get("trackHdPrice"))
+    if sd_price is not None and sd_price < PRICE_THRESHOLD:
+        deals.append(("iTunes", "SD", sd_price))
+    if hd_price is not None and hd_price < PRICE_THRESHOLD and hd_price != sd_price:
+        deals.append(("iTunes", "HD", hd_price))
     return deals
 
 
@@ -153,7 +175,7 @@ def main():
 
     for movie in MOVIES:
         try:
-            deals = search_deals(movie)
+            deals = amazon_deals(movie) + itunes_deals(movie)
             for store, quality, price in deals:
                 key = f"{movie}|{store}|{quality}"
                 if key not in seen:
