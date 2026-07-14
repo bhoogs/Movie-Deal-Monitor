@@ -173,22 +173,28 @@ def main():
     today = date.today().isoformat()
     new_deals = 0
 
+    new_alerts = []
+
     for movie in MOVIES:
         try:
             deals = amazon_deals(movie) + itunes_deals(movie)
             for store, quality, price in deals:
                 key = f"{movie}|{store}|{quality}"
                 if key not in seen:
-                    send_pushover(
-                        f"🎬 Deal: {movie}",
-                        f"${price:.2f} {quality} on {store}",
-                    )
+                    new_alerts.append((movie, store, quality, price))
                     seen[key] = today
                     new_deals += 1
                     print(f"  Deal: {movie} — ${price:.2f} {quality} on {store}")
             time.sleep(0.5)
         except Exception as e:
             print(f"  Error ({movie}): {e}")
+
+    if new_alerts:
+        lines = [f"{movie} — ${price:.2f} {quality} on {store}" for movie, store, quality, price in new_alerts]
+        send_pushover(
+            f"🎬 {len(new_alerts)} Movie Deal{'s' if len(new_alerts) > 1 else ''}",
+            "\n".join(lines),
+        )
 
     save_seen(seen)
     print(f"Done. {new_deals} new deal(s) found.")
