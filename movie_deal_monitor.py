@@ -111,7 +111,7 @@ def search_deals(title):
         if price is None:
             continue
         try:
-            price = float(price)
+            price = float(str(price).lstrip("$"))
         except (ValueError, TypeError):
             continue
         if price >= PRICE_THRESHOLD:
