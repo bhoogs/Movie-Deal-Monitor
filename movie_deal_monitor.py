@@ -15,7 +15,6 @@ PRICE_THRESHOLD = 12.00
 
 MOVIES = [
     "Good Will Hunting",
-    "Gladiator",
     "Up",
     "Batman Begins",
     "The Matrix",
@@ -27,13 +26,11 @@ MOVIES = [
     "The Dark Knight",
     "300",
     "Cast Away",
-    "Interstellar",
     "The King's Speech",
     "Spirited Away",
     "The Dark Knight Rises",
     "Unbreakable",
     "The Imitation Game",
-    "The Prince of Egypt",
     "Sicario",
     "No Country for Old Men",
     "Moneyball",
