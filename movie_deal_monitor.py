@@ -141,7 +141,7 @@ def load_seen():
     if not SEEN_FILE.exists():
         return {}
     data = json.loads(SEEN_FILE.read_text())
-    cutoff = (date.today() - timedelta(days=30)).isoformat()
+    cutoff = (date.today() - timedelta(days=14)).isoformat()
     return {k: v for k, v in data.items() if v >= cutoff}
 
 
