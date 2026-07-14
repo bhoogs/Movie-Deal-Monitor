@@ -96,7 +96,7 @@ def amazon_deals(title):
     if not edges:
         return []
 
-    deals = []
+    best = None
     for offer in edges[0]["node"]["offers"]:
         if offer["monetizationType"] != "BUY":
             continue
@@ -105,8 +105,9 @@ def amazon_deals(title):
         price = parse_price(offer.get("retailPrice"))
         if price is None or price >= PRICE_THRESHOLD:
             continue
-        deals.append(("Amazon", offer["presentationType"], price))
-    return deals
+        if best is None or price < best:
+            best = price
+    return [("Amazon", best)] if best is not None else []
 
 
 def itunes_deals(title):
@@ -132,14 +133,14 @@ def itunes_deals(title):
     if not match:
         return []
 
-    deals = []
     sd_price = parse_price(match.get("trackPrice"))
     hd_price = parse_price(match.get("trackHdPrice"))
-    if sd_price is not None and sd_price < PRICE_THRESHOLD:
-        deals.append(("iTunes", "SD", sd_price))
-    if hd_price is not None and hd_price < PRICE_THRESHOLD and hd_price != sd_price:
-        deals.append(("iTunes", "HD", hd_price))
-    return deals
+    best = None
+    for p in (sd_price, hd_price):
+        if p is not None and p < PRICE_THRESHOLD:
+            if best is None or p < best:
+                best = p
+    return [("iTunes", best)] if best is not None else []
 
 
 def load_seen():
@@ -178,19 +179,19 @@ def main():
     for movie in MOVIES:
         try:
             deals = amazon_deals(movie) + itunes_deals(movie)
-            for store, quality, price in deals:
-                key = f"{movie}|{store}|{quality}"
+            for store, price in deals:
+                key = f"{movie}|{store}"
                 if key not in seen:
-                    new_alerts.append((movie, store, quality, price))
+                    new_alerts.append((movie, store, price))
                     seen[key] = today
                     new_deals += 1
-                    print(f"  Deal: {movie} — ${price:.2f} {quality} on {store}")
+                    print(f"  Deal: {movie} — ${price:.2f} on {store}")
             time.sleep(0.5)
         except Exception as e:
             print(f"  Error ({movie}): {e}")
 
     if new_alerts:
-        lines = [f"{movie} — ${price:.2f} {quality} on {store}" for movie, store, quality, price in new_alerts]
+        lines = [f"{movie} — ${price:.2f} on {store}" for movie, store, price in new_alerts]
         send_pushover(
             f"🎬 {len(new_alerts)} Movie Deal{'s' if len(new_alerts) > 1 else ''}",
             "\n".join(lines),
